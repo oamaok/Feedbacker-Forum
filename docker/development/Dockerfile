@@ -1,8 +1,8 @@
 FROM feedbacker-build
 
-FROM node:10.13-alpine
-
-COPY --from=0 /app /app
 WORKDIR /app/server
 
+RUN npm --prefix ../client run build:dev
+
 CMD npm run watch
+

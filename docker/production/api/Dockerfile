@@ -1,7 +1,7 @@
 FROM feedbacker-build
 
 WORKDIR /app
-RUN sh /prod/docker-build.sh
+RUN sh /app/docker/production/api/docker-build.sh
 
 ###
 

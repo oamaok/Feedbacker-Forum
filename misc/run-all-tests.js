@@ -70,7 +70,7 @@ const defer = (func) => {
 const run = async () => {
   const pCreateBuildDir = exec('create build directory', 'mkdir -p build')
 
-  const pDockerPreload = ['node:10.13-alpine', 'nginx:alpine'].map(image => {
+  const pDockerPreload = ['node:10.13-alpine', 'nginx:alpine', 'postgres:alpine'].map(image => {
     exec(`docker preload ${image}`, `docker pull ${image}`)
   })
 
@@ -110,26 +110,21 @@ const run = async () => {
     await exec('compare generated api.md', 'diff build/api.md docs/api.md')
   })
 
-  /*
-  const pBuilds = (async () => {
-    try {
-      await pDockerBuild
-      await exec('build client development', 'npm run build:dev', { cwd: 'client' })
-      await exec('build client production', 'npm run build', { cwd: 'client' })
-    } catch (error) { throw error }
-  })()
+  const pBuilds = defer(async () => {
+    await pDockerBuild
+    await exec('build client development', 'npm run build:dev', { cwd: 'client' })
+    await exec('build client production', 'npm run build', { cwd: 'client' })
+  })
 
   const pTestServer = exec('test local server', 'npm run test:api', { cwd: 'server' })
 
-  const buildDocker = async (env) => {
-    try {
-      await pDockerBuild
-      const opts = { cwd: `docker/${env}` }
-      await exec(`build ${env} docker`, 'docker-compose build', opts)
-    } catch (error) { throw error }
-  }
+  const buildDocker = (env) => defer(async () => {
+    await pDockerBuild
+    const opts = { cwd: `docker/${env}` }
+    await exec(`build ${env} docker`, 'docker-compose build', opts)
+  })
 
-  const startDocker = async (env) => {
+  const startDocker = (env) => defer(async() => {
     const opts = {
       cwd: `docker/${env}`,
       env: {
@@ -138,26 +133,20 @@ const run = async () => {
       },
     }
 
-    try {
-      await exec(`start ${env} docker`, 'docker-compose up -d', opts)
-      await exec(`test ${env} docker`, 'bash misc/test-server.sh', opts)
-      await exec(`stop ${env} docker`, 'docker-compose down', opts)
-    } catch (error) { throw error }
-  }
+    await exec(`start ${env} docker`, 'docker-compose up -d', opts)
+    await exec(`test ${env} docker`, 'npm run test:remoteapi', { cwd: 'server' })
+    await exec(`stop ${env} docker`, 'docker-compose down', opts)
+  })
 
   const pBuildDev = buildDocker('development')
   const pBuildProd = buildDocker('production')
 
-  const pTestDockers = (async () => {
-    try {
-      await pBuildDev
-      await startDocker('development')
-      await pBuildProd
-      await startDocker('production')
-    } catch (error) { throw error }
-  })()
-
-  */
+  const pTestDockers = defer(async () => {
+    await pBuildDev
+    await startDocker('development')
+    await pBuildProd
+    await startDocker('production')
+  })
 
   await Promise.all(pAllStages)
 }
