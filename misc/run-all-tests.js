@@ -84,7 +84,7 @@ const run = async () => {
   const pDockerBuild = defer(async () => {
     await pDockerPreload
     await exec('docker base image',
-      'docker build -t feedbacker-build . -f docker/build/Dockerfile')
+      'docker build -t feedbacker-build . -f docker/builder/Dockerfile')
   })
 
   /*
