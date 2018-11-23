@@ -36,8 +36,11 @@ const exec = (name, cmd, opts) => {
       if (verbose && stdout)
         info.push(stdout)
 
-      if (error)
-        info.push('', stderr, '')
+      if (error) {
+        if (stderr) info.push('', stderr)
+        if (stdout) info.push('', stdout)
+        info.push('')
+      }
       else if (verbose && stderr)
         info.push(stderr)
 
