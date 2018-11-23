@@ -1,27 +1,63 @@
 const childProcess = require('child_process')
 const { promisify } = require('util')
 
+const verbose = process.argv.includes('--verbose')
+const ci = process.argv.includes('--ci')
+
 const pAllStages = []
 
 const exec = (name, cmd, opts) => {
   const pStage = new Promise((resolve, reject) => {
-    console.log(`Started stage: ${name}`)
+    console.log(`-> ${name}`)
 
-    childProcess.exec(cmd, opts, (error, stdout, stderr) => {
-      const code = error ? error.code : 0
-      console.log([
-        `Stage ${name} finished with code ${code}`,
-        `command: ${cmd}`,
-        stdout,
-        stderr,
-      ].join('\n'))
+    const allOpts = {
+      ...(opts || {}),
+    }
+
+    let [file, ...args] = cmd.split(' ')
+
+    if (file == 'npm' && /^win/.test(process.platform)) {
+      file = 'npm.cmd'
+    }
+
+    const begin = new Date().getTime()
+
+    childProcess.execFile(file, args, allOpts, (error, stdout, stderr) => {
+      const end = new Date().getTime()
+
+      const duration = (end - begin) / 1000.0
+      const prefix = error ? `!! ${name}` : `## ${name}`
+      const suffix = error ? `Failed with code ${error.code}` : `${duration.toFixed(2)}s`
+      const info = [`${prefix}: ${suffix}`]
+
+      if (error)
+        info.unshift('')
+
+      if (verbose && stdout)
+        info.push(stdout)
+
+      if (error)
+        info.push('', stderr, '')
+      else if (verbose && stderr)
+        info.push(stderr)
+
+      console.log(info.join('\n'))
 
       if (error) {
-        reject({ stage: name, error })
+        reject({ stage: name, error, stderr })
       } else {
         resolve()
       }
     })
+  })
+
+  pAllStages.push(pStage)
+  return pStage
+}
+
+const defer = (func) => {
+  const pStage = new Promise((resolve, reject) => {
+    return func().then(resolve).catch(reject)
   })
 
   pAllStages.push(pStage)
@@ -41,40 +77,49 @@ const run = async () => {
   await pInstallServer
   await pInstallClient
 
-  const pLintServer = exec('lint server', 'npm run lint:ci', { cwd: 'server' })
-  const pLintClient = exec('lint client', 'npm run lint:ci', { cwd: 'client' })
+  const lintCmd = ci ? 'lint:ci' : 'lint'
+  const pLintServer = exec('lint server', `npm run ${lintCmd}`, { cwd: 'server' })
+  const pLintClient = exec('lint client', `npm run ${lintCmd}`, { cwd: 'client' })
 
-  const pDockerBuild = async () => {
+  const pDockerBuild = defer(async () => {
     await pDockerPreload
     await exec('docker base image',
       'docker build -t feedbacker-build . -f docker/build/Dockerfile')
-  }
+  })
 
-  const pDocumentation = async () => {
-    await pCreateBuildDir
-    await exec('move committed api.md', 'mv docs/api.md build/api.md')
-    await exec('list endpoints',
-      'npm run start -- --listEndpoints ../build/endpoints.json',
-      { cwd: 'server' })
-    await exec('create documentation',
-      'npm run doc -- --endpoints ../build/endpoints.json',
-      { cwd: 'server' })
+  /*
 
-    await exec('compare generated api.md', 'diff build/api.md docs/api.md')
-  }
+  const pDocumentation = (async () => {
+    try {
+      await pCreateBuildDir
+      await exec('move committed api.md', 'mv docs/api.md build/api.md')
+      await exec('list endpoints',
+        'npm run start -- --listEndpoints ../build/endpoints.json',
+        { cwd: 'server' })
+      await exec('create documentation',
+        'npm run doc -- --endpoints ../build/endpoints.json',
+        { cwd: 'server' })
 
-  const pBuilds = async () => {
-    await pDockerBuild
-    await exec('build client development', 'npm run build:dev', { cwd: 'client' })
-    await exec('build client production', 'npm run build', { cwd: 'client' })
-  }
+      await exec('compare generated api.md', 'diff build/api.md docs/api.md')
+    } catch (error) { throw error }
+  })()
+
+  const pBuilds = (async () => {
+    try {
+      await pDockerBuild
+      await exec('build client development', 'npm run build:dev', { cwd: 'client' })
+      await exec('build client production', 'npm run build', { cwd: 'client' })
+    } catch (error) { throw error }
+  })()
 
   const pTestServer = exec('test local server', 'npm run test:api', { cwd: 'server' })
 
   const buildDocker = async (env) => {
-    await pDockerBuild
-    const opts = { cwd: `docker/${env}` }
-    await exec(`start ${env} docker`, 'docker-compose build', opts)
+    try {
+      await pDockerBuild
+      const opts = { cwd: `docker/${env}` }
+      await exec(`build ${env} docker`, 'docker-compose build', opts)
+    } catch (error) { throw error }
   }
 
   const startDocker = async (env) => {
@@ -86,34 +131,42 @@ const run = async () => {
       },
     }
 
-    await exec(`start ${env} docker`, 'docker-compose up -d', opts)
-    await exec(`test ${env} docker`, 'bash misc/test-server.sh', opts)
-    await exec(`stop ${env} docker`, 'docker-compose down', opts)
+    try {
+      await exec(`start ${env} docker`, 'docker-compose up -d', opts)
+      await exec(`test ${env} docker`, 'bash misc/test-server.sh', opts)
+      await exec(`stop ${env} docker`, 'docker-compose down', opts)
+    } catch (error) { throw error }
   }
 
   const pBuildDev = buildDocker('development')
   const pBuildProd = buildDocker('production')
 
-  const pTestDockers = async () => {
-    await pBuildDev
-    await startDocker('development')
-    await pBuildProd
-    await startDocker('production')
-  }
+  const pTestDockers = (async () => {
+    try {
+      await pBuildDev
+      await startDocker('development')
+      await pBuildProd
+      await startDocker('production')
+    } catch (error) { throw error }
+  })()
+
+  */
 
   await Promise.all(pAllStages)
 }
 
-run().then(() => {
-  console.log('All tests passed succesfully!')
-}).catch((error) => {
-  if (error.stage) {
-    console.error(`Failed at stage: ${error.stage}`)
-    console.error(error.error)
-  } else {
-    console.error('Failed to run tests')
-    console.error(error)
+const main = async () => {
+  try {
+    await run()
+    console.log('All tests passed succesfully!')
+  } catch (error) {
+    if (!error.stage) {
+      console.error('Failed to run tests')
+      console.error(error)
+    }
+    process.exitCode = 1
   }
-  process.exitCode = 1
-})
+}
+
+main()
 
