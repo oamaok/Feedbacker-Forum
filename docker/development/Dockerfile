@@ -1,9 +1,8 @@
+FROM feedbacker-build
+
 FROM node:10.13-alpine
 
-COPY . /app/
-
+COPY --from=0 /app /app
 WORKDIR /app/server
 
-RUN sh /app/docker/development/docker-build.sh
-
-CMD npm start
+CMD npm run watch

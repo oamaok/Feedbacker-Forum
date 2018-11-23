@@ -1,18 +1,11 @@
-FROM node:10.13-alpine
+FROM feedbacker-build
 
-WORKDIR /app
-
-COPY .git /.git
-COPY client/ .
-COPY misc/ /misc
-
-RUN apk add --no-cache git
-RUN npm install
-RUN npm run build
+RUN npm --prefix client run build
 
 ###
 
 FROM nginx:alpine
 
-COPY --from=0 /app /app
 COPY docker/production/nginx/nginx.conf /etc/nginx/nginx.conf
+COPY --from=0 /app/client/build /app/build
+WORKDIR /app
