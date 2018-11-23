@@ -77,12 +77,19 @@ const run = async () => {
   const pInstallServer = exec('npm install server', 'npm install', { cwd: 'server' })
   const pInstallClient = exec('npm install client', 'npm install', { cwd: 'client' })
 
+  const lintCmd = ci ? 'lint:ci' : 'lint'
+  const pLintServer = defer(async () => {
+    await pInstallServer
+    await exec('lint server', `npm run ${lintCmd}`, { cwd: 'server' })
+  })
+
+  const pLintClient = defer(async () => {
+    await pInstallClient
+    await exec('lint client', `npm run ${lintCmd}`, { cwd: 'client' })
+  })
+
   await pInstallServer
   await pInstallClient
-
-  const lintCmd = ci ? 'lint:ci' : 'lint'
-  const pLintServer = exec('lint server', `npm run ${lintCmd}`, { cwd: 'server' })
-  const pLintClient = exec('lint client', `npm run ${lintCmd}`, { cwd: 'client' })
 
   const pDockerBuild = defer(async () => {
     await pDockerPreload
@@ -90,23 +97,20 @@ const run = async () => {
       'docker build -t feedbacker-build . -f docker/builder/Dockerfile')
   })
 
+  const pDocumentation = defer(async () => {
+    await pCreateBuildDir
+    await exec('copy committed api.md', 'cp docs/api.md build/api.md')
+    await exec('list endpoints',
+      'npm run start -- --listEndpoints ../build/endpoints.json',
+      { cwd: 'server' })
+    await exec('create documentation',
+      'npm run doc -- --endpoints ../build/endpoints.json',
+      { cwd: 'server' })
+
+    await exec('compare generated api.md', 'diff build/api.md docs/api.md')
+  })
+
   /*
-
-  const pDocumentation = (async () => {
-    try {
-      await pCreateBuildDir
-      await exec('move committed api.md', 'mv docs/api.md build/api.md')
-      await exec('list endpoints',
-        'npm run start -- --listEndpoints ../build/endpoints.json',
-        { cwd: 'server' })
-      await exec('create documentation',
-        'npm run doc -- --endpoints ../build/endpoints.json',
-        { cwd: 'server' })
-
-      await exec('compare generated api.md', 'diff build/api.md docs/api.md')
-    } catch (error) { throw error }
-  })()
-
   const pBuilds = (async () => {
     try {
       await pDockerBuild
