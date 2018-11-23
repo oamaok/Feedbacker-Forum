@@ -13,4 +13,4 @@ cache:
 services:
   - docker
 
-script: node misc/run-all-tests.js
+script: node misc/run-all-tests.js --ci
