@@ -71,7 +71,7 @@ const run = async () => {
   const pCreateBuildDir = exec('create build directory', 'mkdir -p build')
 
   const pDockerPreload = ['node:10.13-alpine', 'nginx:alpine', 'postgres:alpine'].map(image => {
-    exec(`docker preload ${image}`, `docker pull ${image}`)
+    return exec(`docker preload ${image}`, `docker pull ${image}`)
   })
 
   const pInstallServer = exec('npm install server', 'npm install', { cwd: 'server' })
