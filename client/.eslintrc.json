@@ -12,6 +12,8 @@
     "react/prop-types": "off",
     "react/destructuring-assignment": "off",
     "react/no-multi-comp": "off",
+    "no-param-reassign": ["error", { "props": false }],
+    "no-plusplus": ["off"],
     "no-unused-vars": "warn",
     "no-multi-spaces": "off",
     "no-shadow": "off",

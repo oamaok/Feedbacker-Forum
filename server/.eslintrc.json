@@ -7,6 +7,8 @@
     "semi": ["error", "never"],
     "no-console": "off",
     "import/no-extraneous-dependencies": "off",
+    "no-param-reassign": ["error", { "props": false }],
+    "no-plusplus": ["off"],
     "no-unused-vars": "warn",
     "no-multi-spaces": "off",
     "no-shadow": "off",
